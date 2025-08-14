@@ -1,65 +1,188 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>批量抠图工具（Remove.bg API）</title>
-    <!-- 加载JSZip库 -->
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <style>
-        #drop-area {
-            border: 2px dashed #ccc;
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
             padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
             text-align: center;
-            transition: border-color 0.3s;
+            margin-bottom: 30px;
+        }
+        #drop-area {
+            border: 3px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        #drop-area.highlight {
+            border-color: #4CAF50;
+            background-color: #f0fff0;
+        }
+        #file-input {
+            display: none;
+        }
+        .upload-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .upload-btn:hover {
+            background-color: #45a049;
         }
         #preview {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 20px;
+            gap: 15px;
+            margin: 30px 0;
+            justify-content: center;
         }
         .image-container {
             position: relative;
-            border: 1px solid #eee;
-            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            background: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+        .image-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
         .image-container img {
             max-width: 200px;
             max-height: 200px;
             display: block;
+            border-radius: 5px;
         }
-        button {
-            background: #4CAF50;
-            color: white;
-            padding: 8px 16px;
+        .image-info {
+            margin-top: 8px;
+            font-size: 14px;
+            color: #555;
+            word-break: break-all;
+        }
+        .action-btns {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 25px 0;
+            flex-wrap: wrap;
+        }
+        .action-btn {
+            padding: 12px 24px;
             border: none;
-            border-radius: 4px;
-            margin: 10px 5px 0 0;
+            border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
         }
-        #download-all-btn, #card-maker-btn {
-            background: #2196F3;
+        #process-btn {
+            background-color: #2196F3;
+            color: white;
         }
-        button:disabled {
-            background: #cccccc !important;
+        #process-btn:hover {
+            background-color: #0b7dda;
+        }
+        #process-btn:disabled {
+            background-color: #cccccc;
             cursor: not-allowed;
         }
+        #download-all-btn {
+            background-color: #ff9800;
+            color: white;
+        }
+        #download-all-btn:hover {
+            background-color: #e68a00;
+        }
+        #download-all-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #card-maker-btn {
+            background-color: #9c27b0;
+            color: white;
+        }
+        #card-maker-btn:hover {
+            background-color: #7b1fa2;
+        }
+        #card-maker-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #progress-container {
+            width: 100%;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+        }
+        #progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            border-radius: 5px;
+            width: 0%;
+            transition: width 0.3s;
+        }
         #progress-text {
-            margin: 10px 0;
+            text-align: center;
+            margin-top: 10px;
             color: #666;
+        }
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0,0,0,0.7);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+        .error-message {
+            color: #f44336;
+            font-size: 14px;
+            margin-top: 5px;
         }
     </style>
 </head>
 <body>
     <h1>批量抠图工具（Remove.bg API）</h1>
+    
     <div id="drop-area">
-        <p>拖拽图片到此处，或点击选择文件</p>
+        <p>拖拽图片到此处，或</p>
+        <label for="file-input" class="upload-btn">选择图片文件</label>
         <input type="file" id="file-input" multiple accept="image/*">
     </div>
-    <button id="process-btn">开始抠图</button>
-    <button id="download-all-btn" disabled>打包下载所有图片</button>
-    <button id="card-maker-btn" disabled>制作贺卡</button>
-    <div id="progress-text"></div>
+    
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+        <div id="progress-text"></div>
+    </div>
+    
+    <div class="action-btns">
+        <button id="process-btn" class="action-btn">开始抠图</button>
+        <button id="download-all-btn" class="action-btn" disabled>打包下载</button>
+        <button id="card-maker-btn" class="action-btn" disabled>制作贺卡</button>
+    </div>
+    
     <div id="preview"></div>
 
     <script>
@@ -69,8 +192,10 @@
         const processBtn = document.getElementById("process-btn");
         const downloadAllBtn = document.getElementById("download-all-btn");
         const cardMakerBtn = document.getElementById("card-maker-btn");
-        const progressText = document.getElementById("progress-text");
         const preview = document.getElementById("preview");
+        const progressContainer = document.getElementById("progress-container");
+        const progressBar = document.getElementById("progress-bar");
+        const progressText = document.getElementById("progress-text");
 
         // 全局变量
         let files = [];
@@ -79,22 +204,26 @@
         // 拖拽功能
         dropArea.addEventListener("dragover", (e) => {
             e.preventDefault();
-            dropArea.style.borderColor = "#4CAF50";
+            dropArea.classList.add("highlight");
         });
 
         dropArea.addEventListener("dragleave", () => {
-            dropArea.style.borderColor = "#ccc";
+            dropArea.classList.remove("highlight");
         });
 
         dropArea.addEventListener("drop", (e) => {
             e.preventDefault();
-            dropArea.style.borderColor = "#ccc";
-            updateFiles(e.dataTransfer.files);
+            dropArea.classList.remove("highlight");
+            if (e.dataTransfer.files.length > 0) {
+                updateFiles(e.dataTransfer.files);
+            }
         });
 
         // 文件选择
         fileInput.addEventListener("change", () => {
-            updateFiles(fileInput.files);
+            if (fileInput.files.length > 0) {
+                updateFiles(fileInput.files);
+            }
         });
 
         // 统一更新文件
@@ -108,8 +237,11 @@
         // 重置状态
         function resetState() {
             processedImages = [];
+            processBtn.disabled = false;
             downloadAllBtn.disabled = true;
             cardMakerBtn.disabled = true;
+            progressContainer.style.display = "none";
+            progressBar.style.width = "0%";
             progressText.textContent = "";
         }
 
@@ -117,26 +249,37 @@
         function renderPreview() {
             preview.innerHTML = "";
             
-            if (files.length === 0) return;
+            if (files.length === 0) {
+                console.log('没有可显示的文件');
+                return;
+            }
 
-            files.forEach((file) => {
+            files.forEach((file, index) => {
+                const container = document.createElement("div");
+                container.className = "image-container";
+                
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    const container = document.createElement("div");
-                    container.className = "image-container";
-                    
                     const img = document.createElement("img");
                     img.src = e.target.result;
                     
                     const status = document.createElement("div");
+                    status.className = "status-badge";
                     status.textContent = "待处理";
-                    status.style.marginTop = "5px";
+                    
+                    const fileName = document.createElement("div");
+                    fileName.className = "image-info";
+                    fileName.textContent = file.name.length > 20 
+                        ? file.name.substring(0, 17) + "..." 
+                        : file.name;
                     
                     container.appendChild(img);
                     container.appendChild(status);
-                    preview.appendChild(container);
+                    container.appendChild(fileName);
                 };
                 reader.readAsDataURL(file);
+                
+                preview.appendChild(container);
             });
         }
 
@@ -166,6 +309,7 @@
             }
 
             processBtn.disabled = true;
+            progressContainer.style.display = "block";
             progressText.textContent = "开始处理图片...";
             preview.innerHTML = "";
             processedImages = [];
@@ -176,44 +320,63 @@
                 container.className = "image-container";
                 
                 try {
-                    // 显示处理状态
-                    const status = document.createElement("div");
-                    status.textContent = `处理中 (${i+1}/${files.length})...`;
-                    status.style.marginTop = "5px";
+                    // 更新进度
+                    const progress = Math.floor((i / files.length) * 100);
+                    progressBar.style.width = `${progress}%`;
+                    progressText.textContent = `正在处理 ${i+1}/${files.length}: ${file.name}`;
                     
+                    // 显示原始图片和状态
                     const img = document.createElement("img");
                     img.src = URL.createObjectURL(file);
                     
+                    const status = document.createElement("div");
+                    status.className = "status-badge";
+                    status.textContent = "处理中";
+                    
+                    const fileName = document.createElement("div");
+                    fileName.className = "image-info";
+                    fileName.textContent = file.name.length > 20 
+                        ? file.name.substring(0, 17) + "..." 
+                        : file.name;
+                    
                     container.appendChild(img);
                     container.appendChild(status);
+                    container.appendChild(fileName);
                     preview.appendChild(container);
 
                     // 执行抠图
                     const processedBlob = await removeBackground(file);
                     const processedUrl = URL.createObjectURL(processedBlob);
                     
-                    // 更新显示
+                    // 更新显示结果
                     img.src = processedUrl;
-                    status.textContent = "处理完成";
+                    status.textContent = "已完成";
+                    status.style.backgroundColor = "#4CAF50";
                     
-                    // 存储结果
+                    // 存储处理结果（保留原始文件名但改为png格式）
+                    const processedName = file.name.replace(/\.[^/.]+$/, "") + ".png";
                     processedImages.push({
                         blob: processedBlob,
                         url: processedUrl,
-                        name: file.name
+                        name: processedName,
+                        originalName: file.name
                     });
                     
                 } catch (error) {
                     console.error(`处理 ${file.name} 失败:`, error);
-                    const errorText = document.createElement("div");
-                    errorText.textContent = `失败: ${error.message}`;
-                    errorText.style.color = "red";
-                    container.appendChild(errorText);
+                    
+                    const errorMsg = document.createElement("div");
+                    errorMsg.className = "error-message";
+                    errorMsg.textContent = `处理失败: ${error.message}`;
+                    
+                    container.appendChild(errorMsg);
                 }
             }
 
+            // 完成处理
+            progressBar.style.width = "100%";
+            progressText.textContent = `处理完成 (成功 ${processedImages.length}/${files.length} 张)`;
             processBtn.disabled = false;
-            progressText.textContent = `处理完成，成功 ${processedImages.length}/${files.length} 张`;
             
             if (processedImages.length > 0) {
                 downloadAllBtn.disabled = false;
@@ -221,7 +384,7 @@
             }
         });
 
-        // 打包下载所有图片（使用全局JSZip）
+        // 打包下载所有图片
         downloadAllBtn.addEventListener("click", async () => {
             if (processedImages.length === 0) {
                 alert("没有可下载的图片！");
@@ -232,17 +395,12 @@
                 downloadAllBtn.disabled = true;
                 progressText.textContent = "正在准备压缩包...";
                 
-                // 使用全局JSZip
-                if (!window.JSZip) {
-                    throw new Error("JSZip库加载失败，请刷新页面重试");
-                }
-                
                 const zip = new JSZip();
                 let processedCount = 0;
                 
                 // 添加文件到压缩包
-                processedImages.forEach((img, i) => {
-                    zip.file(`removed-bg-${i}.png`, img.blob);
+                processedImages.forEach((img) => {
+                    zip.file(img.name, img.blob);
                     processedCount++;
                     progressText.textContent = `正在压缩 (${processedCount}/${processedImages.length})...`;
                 });
@@ -284,10 +442,24 @@
                 return;
             }
             
-            const imageUrls = processedImages.map(img => img.url);
-            sessionStorage.setItem("cardImages", JSON.stringify(imageUrls));
+            // 准备传递给贺卡页面的数据
+            const cardImages = processedImages.map(img => ({
+                url: img.url,
+                name: img.name,
+                originalName: img.originalName
+            }));
+            
+            // 存储到sessionStorage
+            sessionStorage.setItem("cardImages", JSON.stringify(cardImages));
+            
+            // 跳转到贺卡页面
             window.location.href = "card.html";
         });
+
+        // 初始化：清除可能的旧数据
+        window.onload = function() {
+            sessionStorage.removeItem("cardImages");
+        };
     </script>
 </body>
 </html>
