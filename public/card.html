@@ -13,28 +13,44 @@
             display: flex;
         }
         #toolbar {
-            width: 200px;
+            width: 250px;
             padding: 10px;
             border-right: 1px solid #ccc;
         }
         #canvas-container {
             margin-left: 20px;
+            border: 1px solid #eee;
+            padding: 10px;
         }
         button {
             display: block;
             margin: 10px 0;
             padding: 8px;
             width: 100%;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
         }
         .bg-option {
-            width: 80px;
-            height: 60px;
-            margin: 5px;
+            width: 100%;
+            height: 80px;
+            margin: 5px 0;
             cursor: pointer;
-            border: 2px solid transparent;
+            border: 2px solid #ddd;
+            object-fit: cover;
+            transition: all 0.3s;
         }
         .bg-option:hover {
             border-color: #4CAF50;
+            transform: scale(1.02);
+        }
+        .bg-option.selected {
+            border-color: #2196F3;
+            box-shadow: 0 0 5px rgba(33, 150, 243, 0.5);
+        }
+        #custom-bg {
+            display: none;
         }
     </style>
 </head>
@@ -44,9 +60,13 @@
         <div id="toolbar">
             <h3>背景选择</h3>
             <div id="bg-options">
-                <img src="/backgrounds/bg1.jpg" class="bg-option"> onclick="changeBg(this.src)">
-                <img src="/backgrounds/bg2.jpg" class="bg-option">onclick="changeBg(this.src)">
+                <img src="/backgrounds/bg1.jpg" class="bg-option" onclick="changeBg(this)">
+                <img src="/backgrounds/bg2.jpg" class="bg-option" onclick="changeBg(this)">
+                <img src="/backgrounds/bg3.jpg" class="bg-option" onclick="changeBg(this)">
             </div>
+            
+            <input type="file" id="custom-bg" accept="image/*">
+            <button onclick="document.getElementById('custom-bg').click()">上传自定义背景</button>
             
             <h3>文字工具</h3>
             <input type="text" id="text-input" placeholder="输入祝福语">
@@ -71,59 +91,133 @@
         const layer = new Konva.Layer();
         stage.add(layer);
         
-        // 当前选中的图片（从抠图页面传过来的）
-        let currentImages = [];
+        // 当前背景图
+        let currentBg = null;
         
-        // 更换背景
-        function changeBg(bgUrl) {
-            Konva.Image.fromURL(bgUrl, function(bgImg) {
-                bgImg.setAttrs({
-                    width: stage.width(),
-                    height: stage.height()
-                });
-                layer.find('Image')[0]?.destroy(); // 移除旧背景
-                layer.add(bgImg);
-                layer.draw();
-            });
-        }
-        
-        // 添加文字
-        function addText() {
-            const text = new Konva.Text({
-                text: document.getElementById('text-input').value,
-                x: 100,
-                y: 100,
-                fontSize: 30,
-                draggable: true,
-                fill: '#333333'
-            });
-            layer.add(text);
-            layer.draw();
-        }
-        
-        // 下载贺卡
-        function download() {
-            const dataURL = stage.toDataURL({ quality: 0.9 });
-            const link = document.createElement('a');
-            link.download = '贺卡.png';
-            link.href = dataURL;
-            link.click();
-        }
-        
-        // 从URL获取图片（稍后从抠图页面传图）
-        function loadImages(imageUrls) {
-            imageUrls.forEach(url => {
+        // 从抠图页面加载图片
+        function loadImages() {
+            const images = JSON.parse(sessionStorage.getItem("cardImages")) || [];
+            
+            images.forEach((url, i) => {
                 Konva.Image.fromURL(url, function(img) {
                     img.setAttrs({
+                        x: 100 + (i % 3) * 210,
+                        y: 100 + Math.floor(i / 3) * 210,
                         width: 200,
                         height: 200,
-                        draggable: true
+                        draggable: true,
+                        shadowColor: 'black',
+                        shadowBlur: 10,
+                        shadowOpacity: 0.5,
+                        shadowOffset: { x: 5, y: 5 }
                     });
                     layer.add(img);
                     layer.draw();
                 });
             });
+            
+            // 默认加载第一个背景
+            if (document.querySelector('.bg-option')) {
+                changeBg(document.querySelector('.bg-option'));
+            }
         }
+        
+        // 更换背景
+        function changeBg(element) {
+            // 移除之前选中的样式
+            document.querySelectorAll('.bg-option').forEach(el => {
+                el.classList.remove('selected');
+            });
+            
+            // 添加选中样式
+            element.classList.add('selected');
+            
+            Konva.Image.fromURL(element.src, function(bgImg) {
+                // 移除旧背景
+                if (currentBg) {
+                    currentBg.destroy();
+                }
+                
+                bgImg.setAttrs({
+                    width: stage.width(),
+                    height: stage.height(),
+                    listening: false // 背景不可交互
+                });
+                
+                layer.add(bgImg);
+                layer.draw();
+                currentBg = bgImg;
+                
+                // 将背景置于最底层
+                bgImg.moveToBottom();
+            });
+        }
+        
+        // 自定义背景上传
+        document.getElementById('custom-bg').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const tempImg = new Image();
+                tempImg.src = event.target.result;
+                tempImg.onload = function() {
+                    // 创建临时选项
+                    const option = document.createElement('img');
+                    option.className = 'bg-option selected';
+                    option.src = event.target.result;
+                    option.onclick = function() { changeBg(this); };
+                    
+                    // 清除其他选中状态
+                    document.querySelectorAll('.bg-option').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                    
+                    // 添加到选项列表最前面
+                    document.getElementById('bg-options').prepend(option);
+                    changeBg(option);
+                };
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // 添加文字
+        function addText() {
+            const text = new Konva.Text({
+                text: document.getElementById('text-input').value,
+                x: 50,
+                y: 50,
+                fontSize: 30,
+                fontFamily: 'Arial',
+                fill: '#333333',
+                draggable: true,
+                shadowColor: 'rgba(0,0,0,0.5)',
+                shadowBlur: 5,
+                shadowOffset: { x: 2, y: 2 },
+                shadowOpacity: 0.8
+            });
+            layer.add(text);
+            layer.draw();
+            document.getElementById('text-input').value = '';
+        }
+        
+        // 下载贺卡
+        function download() {
+            const dataURL = stage.toDataURL({ 
+                mimeType: 'image/png',
+                quality: 0.9
+            });
+            const link = document.createElement('a');
+            link.download = 'custom-card.png';
+            link.href = dataURL;
+            link.click();
+        }
+        
+        // 页面加载完成后初始化
+        window.onload = function() {
+            loadImages();
+        };
     </script>
 </body>
 </html>
