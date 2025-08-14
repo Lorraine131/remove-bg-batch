@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>批量抠图工具（Remove.bg API）</title>
+    <!-- 加载JSZip库 -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <style>
         #drop-area {
             border: 2px dashed #ccc;
             padding: 20px;
             text-align: center;
             transition: border-color 0.3s;
-        }
-        #drop-area.highlight {
-            border-color: #4CAF50;
         }
         #preview {
             display: flex;
@@ -29,16 +28,7 @@
             max-height: 200px;
             display: block;
         }
-        .download-btn {
-            background: #4CAF50;
-            color: white;
-            padding: 5px 10px;
-            border: none;
-            border-radius: 3px;
-            margin-top: 5px;
-            cursor: pointer;
-        }
-        #process-btn, #download-all-btn, #card-maker-btn {
+        button {
             background: #4CAF50;
             color: white;
             padding: 8px 16px;
@@ -46,26 +36,30 @@
             border-radius: 4px;
             margin: 10px 5px 0 0;
             cursor: pointer;
-            font-size: 14px;
         }
-        #card-maker-btn {
+        #download-all-btn, #card-maker-btn {
             background: #2196F3;
         }
         button:disabled {
             background: #cccccc !important;
             cursor: not-allowed;
         }
+        #progress-text {
+            margin: 10px 0;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <h1>批量抠图工具（Remove.bg API）</h1>
-    <div id="drop-area" class="">
+    <div id="drop-area">
         <p>拖拽图片到此处，或点击选择文件</p>
         <input type="file" id="file-input" multiple accept="image/*">
     </div>
     <button id="process-btn">开始抠图</button>
     <button id="download-all-btn" disabled>打包下载所有图片</button>
     <button id="card-maker-btn" disabled>制作贺卡</button>
+    <div id="progress-text"></div>
     <div id="preview"></div>
 
     <script>
@@ -75,6 +69,7 @@
         const processBtn = document.getElementById("process-btn");
         const downloadAllBtn = document.getElementById("download-all-btn");
         const cardMakerBtn = document.getElementById("card-maker-btn");
+        const progressText = document.getElementById("progress-text");
         const preview = document.getElementById("preview");
 
         // 全局变量
@@ -84,26 +79,22 @@
         // 拖拽功能
         dropArea.addEventListener("dragover", (e) => {
             e.preventDefault();
-            dropArea.classList.add("highlight");
+            dropArea.style.borderColor = "#4CAF50";
         });
 
         dropArea.addEventListener("dragleave", () => {
-            dropArea.classList.remove("highlight");
+            dropArea.style.borderColor = "#ccc";
         });
 
         dropArea.addEventListener("drop", (e) => {
             e.preventDefault();
-            dropArea.classList.remove("highlight");
-            if (e.dataTransfer.files.length > 0) {
-                updateFiles(e.dataTransfer.files);
-            }
+            dropArea.style.borderColor = "#ccc";
+            updateFiles(e.dataTransfer.files);
         });
 
         // 文件选择
         fileInput.addEventListener("change", () => {
-            if (fileInput.files.length > 0) {
-                updateFiles(fileInput.files);
-            }
+            updateFiles(fileInput.files);
         });
 
         // 统一更新文件
@@ -119,18 +110,16 @@
             processedImages = [];
             downloadAllBtn.disabled = true;
             cardMakerBtn.disabled = true;
+            progressText.textContent = "";
         }
 
         // 显示预览
         function renderPreview() {
             preview.innerHTML = "";
             
-            if (files.length === 0) {
-                console.log('没有可显示的文件');
-                return;
-            }
+            if (files.length === 0) return;
 
-            files.forEach((file, index) => {
+            files.forEach((file) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const container = document.createElement("div");
@@ -171,44 +160,43 @@
 
         // 批量处理图片
         processBtn.addEventListener("click", async () => {
-            // 双重检查文件状态
-            const currentFiles = fileInput.files.length > 0 ? fileInput.files : files;
-            if (!currentFiles || currentFiles.length === 0) {
-                alert("请先上传有效的图片文件！");
+            if (files.length === 0) {
+                alert("请先上传图片！");
                 return;
             }
 
             processBtn.disabled = true;
+            progressText.textContent = "开始处理图片...";
             preview.innerHTML = "";
             processedImages = [];
 
-            for (let i = 0; i < currentFiles.length; i++) {
-                const file = currentFiles[i];
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
                 const container = document.createElement("div");
                 container.className = "image-container";
                 
                 try {
-                    // 显示原始图片和加载状态
-                    const originalImg = document.createElement("img");
-                    originalImg.src = URL.createObjectURL(file);
-                    container.appendChild(originalImg);
-                    
+                    // 显示处理状态
                     const status = document.createElement("div");
-                    status.textContent = "处理中...";
+                    status.textContent = `处理中 (${i+1}/${files.length})...`;
                     status.style.marginTop = "5px";
-                    container.appendChild(status);
                     
+                    const img = document.createElement("img");
+                    img.src = URL.createObjectURL(file);
+                    
+                    container.appendChild(img);
+                    container.appendChild(status);
                     preview.appendChild(container);
 
                     // 执行抠图
                     const processedBlob = await removeBackground(file);
                     const processedUrl = URL.createObjectURL(processedBlob);
                     
-                    // 更新显示结果
-                    originalImg.src = processedUrl;
+                    // 更新显示
+                    img.src = processedUrl;
                     status.textContent = "处理完成";
                     
-                    // 存储处理结果
+                    // 存储结果
                     processedImages.push({
                         blob: processedBlob,
                         url: processedUrl,
@@ -217,25 +205,23 @@
                     
                 } catch (error) {
                     console.error(`处理 ${file.name} 失败:`, error);
-                    if (container.parentNode) {
-                        const errorText = document.createElement("div");
-                        errorText.textContent = `失败: ${error.message}`;
-                        errorText.style.color = "red";
-                        container.appendChild(errorText);
-                    }
+                    const errorText = document.createElement("div");
+                    errorText.textContent = `失败: ${error.message}`;
+                    errorText.style.color = "red";
+                    container.appendChild(errorText);
                 }
             }
 
             processBtn.disabled = false;
+            progressText.textContent = `处理完成，成功 ${processedImages.length}/${files.length} 张`;
             
-            // 如果有成功处理的图片，启用按钮
             if (processedImages.length > 0) {
                 downloadAllBtn.disabled = false;
                 cardMakerBtn.disabled = false;
             }
         });
 
-        // 打包下载所有图片
+        // 打包下载所有图片（使用全局JSZip）
         downloadAllBtn.addEventListener("click", async () => {
             if (processedImages.length === 0) {
                 alert("没有可下载的图片！");
@@ -244,29 +230,49 @@
 
             try {
                 downloadAllBtn.disabled = true;
-                const JSZip = await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js");
+                progressText.textContent = "正在准备压缩包...";
+                
+                // 使用全局JSZip
+                if (!window.JSZip) {
+                    throw new Error("JSZip库加载失败，请刷新页面重试");
+                }
+                
                 const zip = new JSZip();
-
+                let processedCount = 0;
+                
+                // 添加文件到压缩包
                 processedImages.forEach((img, i) => {
                     zip.file(`removed-bg-${i}.png`, img.blob);
+                    processedCount++;
+                    progressText.textContent = `正在压缩 (${processedCount}/${processedImages.length})...`;
                 });
 
-                const zipBlob = await zip.generateAsync({ type: "blob" });
-                const zipUrl = URL.createObjectURL(zipBlob);
+                // 生成ZIP文件
+                progressText.textContent = "正在生成压缩文件...";
+                const zipBlob = await zip.generateAsync({ 
+                    type: "blob",
+                    compression: "DEFLATE",
+                    compressionOptions: { level: 6 }
+                });
                 
+                // 触发下载
+                progressText.textContent = "正在准备下载...";
+                const zipUrl = URL.createObjectURL(zipBlob);
                 const a = document.createElement("a");
                 a.href = zipUrl;
                 a.download = "removed-bg-images.zip";
                 a.click();
                 
+                // 清理
                 setTimeout(() => {
                     URL.revokeObjectURL(zipUrl);
+                    progressText.textContent = "下载完成！";
                     downloadAllBtn.disabled = false;
                 }, 100);
                 
             } catch (error) {
                 console.error("打包失败:", error);
-                alert("打包下载失败，请查看控制台日志");
+                progressText.textContent = `打包失败: ${error.message}`;
                 downloadAllBtn.disabled = false;
             }
         });
