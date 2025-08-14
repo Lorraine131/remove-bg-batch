@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>批量抠图工具（Remove.bg API）</title>
+    <style>
+        /* 原有样式保持不变 */
+        #drop-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+        }
+        #preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .image-container {
+            position: relative;
+        }
+        .image-container img {
+            max-width: 200px;
+            max-height: 200px;
+        }
+        .download-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            cursor: pointer;
+        }
+        /* 新增样式 */
+        #card-maker-btn {
+            background: #2196F3;
+            margin-top: 15px;
+            padding: 8px 16px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>批量抠图工具（Remove.bg API）</h1>
+    <div id="drop-area">
+        <p>拖拽图片到此处，或点击选择文件</p>
+        <input type="file" id="file-input" multiple accept="image/*">
+    </div>
+    <button id="process-btn">开始抠图</button>
+    <button id="download-all-btn">打包下载所有图片</button>
+    <!-- 新增贺卡制作按钮 -->
+    <button id="card-maker-btn" style="display:none;">制作贺卡</button>
+    <div id="preview"></div>
+
+    <script>
+        const fileInput = document.getElementById("file-input");
+        const dropArea = document.getElementById("drop-area");
+        const processBtn = document.getElementById("process-btn");
+        const downloadAllBtn = document.getElementById("download-all-btn");
+        const cardMakerBtn = document.getElementById("card-maker-btn");
+        const preview = document.getElementById("preview");
+
+        let files = [];
+        let processedImages = []; // 新增：存储处理后的图片
+
+        // ...【保持原有的拖拽、文件选择、renderPreview函数不变】...
+
+        // 调用后端 API 抠图
+        async function removeBackground(file) {
+            const formData = new FormData();
+            formData.append("image", file);
+
+            const response = await fetch("/api/remove-bg", {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`API 请求失败: ${response.status}`);
+            }
+
+            return await response.blob();
+        }
+
+        // 批量处理图片
+        processBtn.addEventListener("click", async () => {
+            if (files.length === 0) {
+                alert("请先上传图片！");
+                return;
+            }
+
+            // 清空之前的结果
+            preview.innerHTML = "";
+            processedImages = [];
+            cardMakerBtn.style.display = "none";
+
+            for (let i = 0; i < files.length; i++) {
+                try {
+                    const processedBlob = await removeBackground(files[i]);
+                    const processedUrl = URL.createObjectURL(processedBlob);
+                    
+                    // 存储处理后的图片（新增）
+                    processedImages.push({
+                        blob: processedBlob,
+                        url: processedUrl,
+                        name: files[i].name
+                    });
+                    
+                    // 显示处理后的图片
+                    const img = document.createElement("img");
+                    img.src = processedUrl;
+                    const container = document.createElement("div");
+                    container.className = "image-container";
+                    
+                    // 添加下载按钮
+                    const downloadBtn = document.createElement("button");
+                    downloadBtn.className = "download-btn";
+                    downloadBtn.textContent = "下载";
+                    downloadBtn.onclick = () => {
+                        const a = document.createElement("a");
+                        a.href = processedUrl;
+                        a.download = `removed-bg-${i}.png`;
+                        a.click();
+                    };
+                    
+                    container.appendChild(img);
+                    container.appendChild(downloadBtn);
+                    preview.appendChild(container);
+                } catch (error) {
+                    console.error(`处理 ${files[i].name} 失败:`, error);
+                }
+            }
+
+            // 如果有成功处理的图片，显示贺卡按钮（新增）
+            if (processedImages.length > 0) {
+                cardMakerBtn.style.display = "inline-block";
+            }
+        });
+
+        // 打包下载所有图片（使用 JSZip）
+        downloadAllBtn.addEventListener("click", async () => {
+            if (processedImages.length === 0) {
+                alert("没有可下载的图片！");
+                return;
+            }
+
+            const JSZip = await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js");
+            const zip = new JSZip.default();
+
+            for (let i = 0; i < processedImages.length; i++) {
+                zip.file(`removed-bg-${i}.png`, processedImages[i].blob);
+            }
+
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+            const zipUrl = URL.createObjectURL(zipBlob);
+            
+            const a = document.createElement("a");
+            a.href = zipUrl;
+            a.download = "removed-bg-images.zip";
+            a.click();
+        });
+
+        // 新增：跳转到贺卡制作页面
+        cardMakerBtn.addEventListener("click", () => {
+            // 把处理好的图片URL存入临时存储
+            const imageUrls = processedImages.map(img => img.url);
+            sessionStorage.setItem("cardImages", JSON.stringify(imageUrls));
+            
+            // 跳转到贺卡页面
+            window.location.href = "card.html";
+        });
+    </script>
+</body>
+</html>

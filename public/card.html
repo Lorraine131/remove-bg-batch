@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>AI贺卡制作</title>
+    <script src="https://unpkg.com/konva@8.3.2/konva.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #container {
+            display: flex;
+        }
+        #toolbar {
+            width: 200px;
+            padding: 10px;
+            border-right: 1px solid #ccc;
+        }
+        #canvas-container {
+            margin-left: 20px;
+        }
+        button {
+            display: block;
+            margin: 10px 0;
+            padding: 8px;
+            width: 100%;
+        }
+        .bg-option {
+            width: 80px;
+            height: 60px;
+            margin: 5px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .bg-option:hover {
+            border-color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI贺卡编辑器</h1>
+    <div id="container">
+        <div id="toolbar">
+            <h3>背景选择</h3>
+            <div id="bg-options">
+                <img src="/backgrounds/bg1.jpg" class="bg-option"> onclick="changeBg(this.src)">
+                <img src="/backgrounds/bg2.jpg" class="bg-option">onclick="changeBg(this.src)">
+            </div>
+            
+            <h3>文字工具</h3>
+            <input type="text" id="text-input" placeholder="输入祝福语">
+            <button onclick="addText()">添加文字</button>
+            
+            <h3>操作</h3>
+            <button onclick="download()">下载贺卡</button>
+        </div>
+        
+        <div id="canvas-container">
+            <div id="canvas"></div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化画布
+        const stage = new Konva.Stage({
+            container: 'canvas',
+            width: 800,
+            height: 600
+        });
+        const layer = new Konva.Layer();
+        stage.add(layer);
+        
+        // 当前选中的图片（从抠图页面传过来的）
+        let currentImages = [];
+        
+        // 更换背景
+        function changeBg(bgUrl) {
+            Konva.Image.fromURL(bgUrl, function(bgImg) {
+                bgImg.setAttrs({
+                    width: stage.width(),
+                    height: stage.height()
+                });
+                layer.find('Image')[0]?.destroy(); // 移除旧背景
+                layer.add(bgImg);
+                layer.draw();
+            });
+        }
+        
+        // 添加文字
+        function addText() {
+            const text = new Konva.Text({
+                text: document.getElementById('text-input').value,
+                x: 100,
+                y: 100,
+                fontSize: 30,
+                draggable: true,
+                fill: '#333333'
+            });
+            layer.add(text);
+            layer.draw();
+        }
+        
+        // 下载贺卡
+        function download() {
+            const dataURL = stage.toDataURL({ quality: 0.9 });
+            const link = document.createElement('a');
+            link.download = '贺卡.png';
+            link.href = dataURL;
+            link.click();
+        }
+        
+        // 从URL获取图片（稍后从抠图页面传图）
+        function loadImages(imageUrls) {
+            imageUrls.forEach(url => {
+                Konva.Image.fromURL(url, function(img) {
+                    img.setAttrs({
+                        width: 200,
+                        height: 200,
+                        draggable: true
+                    });
+                    layer.add(img);
+                    layer.draw();
+                });
+            });
+        }
+    </script>
+</body>
+</html>
